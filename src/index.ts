@@ -28,6 +28,7 @@ program
   .option('-q, --quant <quantization>', 'Quantization (INT4, INT8, FP16)')
   .option('-o, --output <file>', 'Output file path')
   .option('-p, --path <path>', 'Custom llama-bench binary path')
+  .option('--model-path <path>', 'Custom model path (skip download)')
   .action(async (options) => {
     await runBenchmarks(options);
   });

@@ -3,6 +3,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import axios from 'axios';
 import chalk from 'chalk';
 import ora from 'ora';
 
@@ -30,6 +31,7 @@ interface RunOptions {
   quant?: string;
   output?: string;
   path?: string;  // Custom llama-bench path
+  modelPath?: string;  // Custom model path (skip download)
 }
 
 export async function runBenchmarks(options: RunOptions) {
@@ -72,15 +74,18 @@ export async function runBenchmarks(options: RunOptions) {
       console.log(chalk.white('Version: ') + chalk.gray('unknown'));
     }
 
+    // Handle model download
+    const modelPath = options.modelPath || await handleModelDownload(model, quant);
+
     // Run benchmark
     spinner.start('Running benchmark (this may take a few minutes)');
     
-    const model = options.model || 'llama-3-70b';
-    const quant = options.quant || 'INT4';
     const outputFile = options.output || `benchmark-${Date.now()}.json`;
 
-    // Simulate benchmark run (would integrate with actual llama.cpp)
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Execute llama-bench with the model
+    const benchmarkCmd = `"${llamaBenchPath}" -m "${modelPath}" -t 8 -b 512 -ngl 99 --json 2>&1`;
+    
+    const { stdout } = await execAsync(benchmarkCmd);
 
     const result = {
       gpuId: gpuInfo.id,
@@ -140,6 +145,99 @@ async function findLlamaBench(customPath?: string): Promise<string | null> {
   }
 
   return null;
+}
+
+async function handleModelDownload(model: string, quant: string): Promise<string> {
+  const modelsDir = path.join(os.homedir(), '.llmbench', 'models');
+  
+  // Create models directory
+  if (!fs.existsSync(modelsDir)) {
+    fs.mkdirSync(modelsDir, { recursive: true });
+  }
+
+  // Map model names to HuggingFace repos
+  const modelMap: Record<string, { repo: string; file: string; sizeGB: number }> = {
+    'llama-3-70b': {
+      repo: 'unsloth/Meta-Llama-3-70B-GGUF',
+      file: `meta-llama-3-70b-${quant.toLowerCase()}.gguf`,
+      sizeGB: quant === 'INT4' ? 40 : quant === 'INT8' ? 70 : 140,
+    },
+    'llama-3-8b': {
+      repo: 'unsloth/Meta-Llama-3-8B-GGUF',
+      file: `meta-llama-3-8b-${quant.toLowerCase()}.gguf`,
+      sizeGB: quant === 'INT4' ? 5 : quant === 'INT8' ? 9 : 16,
+    },
+    'qwen-3.5-27b': {
+      repo: 'unsloth/Qwen-3.5-27B-GGUF',
+      file: `qwen-3.5-27b-${quant.toLowerCase()}.gguf`,
+      sizeGB: quant === 'INT4' ? 16 : quant === 'INT8' ? 28 : 54,
+    },
+    'mistral-7b': {
+      repo: 'unsloth/Mistral-7B-GGUF',
+      file: `mistral-7b-${quant.toLowerCase()}.gguf`,
+      sizeGB: quant === 'INT4' ? 4 : quant === 'INT8' ? 8 : 14,
+    },
+  };
+
+  const modelInfo = modelMap[model] || {
+    repo: `unsloth/${model}-GGUF`,
+    file: `${model}-${quant.toLowerCase()}.gguf`,
+    sizeGB: 40, // Default estimate
+  };
+
+  const modelFilePath = path.join(modelsDir, modelInfo.file);
+
+  // Check if model already exists
+  if (fs.existsSync(modelFilePath)) {
+    console.log(chalk.green('✓ Model found: ') + chalk.gray(modelFilePath));
+    return modelFilePath;
+  }
+
+  // Check if huggingface-cli is available
+  try {
+    await execAsync('huggingface-cli --version');
+    
+    console.log(chalk.yellow('\nModel not found. Download from HuggingFace?'));
+    console.log(chalk.white(`  Repo: ${modelInfo.repo}`));
+    console.log(chalk.white(`  File: ${modelInfo.file}`));
+    console.log(chalk.white(`  Size: ~${modelInfo.sizeGB} GB`));
+    console.log(chalk.yellow('\nThis may take 10-30 minutes depending on your connection.\n'));
+
+    const readline = await import('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    const answer = await new Promise<string>(resolve => {
+      rl.question(chalk.green('Download now? (y/n): '), resolve);
+      rl.close();
+    });
+
+    if (answer.toLowerCase() !== 'y') {
+      console.log(chalk.yellow('\nDownload cancelled.'));
+      console.log(chalk.white('Specify custom model path with: ') + chalk.green('--model-path=/path/to/model.gguf\n'));
+      process.exit(0);
+    }
+
+    // Download using huggingface-cli
+    const spinner = ora(`Downloading ${modelInfo.file} (${modelInfo.sizeGB} GB)`).start();
+    
+    await execAsync(
+      `huggingface-cli download ${modelInfo.repo} ${modelInfo.file} --local-dir "${modelsDir}"`
+    );
+
+    spinner.succeed('Download complete!');
+    return modelFilePath;
+
+  } catch {
+    // huggingface-cli not installed
+    console.log(chalk.yellow('\nhuggingface-cli not found.'));
+    console.log(chalk.white('\nInstall it: ') + chalk.green('pip install huggingface_hub\n'));
+    console.log(chalk.white('Or download manually from: ') + chalk.blue(`https://huggingface.co/${modelInfo.repo}\n`));
+    console.log(chalk.white('Then run with: ') + chalk.green(`--model-path=/path/to/${modelInfo.file}\n`));
+    process.exit(0);
+  }
 }
 
 async function detectGPU() {

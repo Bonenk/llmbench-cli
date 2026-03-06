@@ -32,7 +32,7 @@ llm-bench init --api-key=your_api_key
 # Auto-detect GPU, run default benchmark (llama-3-70b INT4)
 llm-bench run
 
-# Specify model and quantization
+# Specify model and quantization (auto-downloads from HuggingFace)
 llm-bench run --model=llama-3-70b --quant=INT4
 
 # Save results to specific file
@@ -40,12 +40,22 @@ llm-bench run --output=my-benchmark.json
 
 # Custom llama-bench path (if not in PATH)
 llm-bench run --path=/home/user/llama.cpp/llama-bench
+
+# Use already downloaded model
+llm-bench run --model-path=/models/llama-3-70b-Q4_K_M.gguf
 ```
 
 **Auto-detection:**
 - Searches common locations (`~/llama.cpp`, `/usr/local/bin`, etc.)
 - Checks your PATH
 - Use `--path` if llama-bench is in custom location
+
+**Model Download:**
+- Auto-downloads from HuggingFace (Unsloth GGUF models)
+- Stores in `~/.llmbench/models/`
+- Reuses existing downloads
+- Requires `huggingface-cli` (`pip install huggingface_hub`)
+- Use `--model-path` to skip download
 
 ### 4. Submit Results
 
