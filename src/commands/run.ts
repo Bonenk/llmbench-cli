@@ -1,15 +1,35 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import chalk from 'chalk';
 import ora from 'ora';
 
 const execAsync = promisify(exec);
 
+// Common llama.cpp binary locations
+const LLAMA_BENCH_PATHS = [
+  './llama-bench',
+  '../llama.cpp/llama-bench',
+  path.join(os.homedir(), 'llama.cpp', 'llama-bench'),
+  path.join(os.homedir(), 'src', 'llama.cpp', 'llama-bench'),
+  '/usr/local/bin/llama-bench',
+  '/usr/bin/llama-bench',
+];
+
+// Also check PATH
+const PATHS = process.env.PATH?.split(path.delimiter) || [];
+PATHS.forEach(p => {
+  LLAMA_BENCH_PATHS.push(path.join(p, 'llama-bench'));
+  LLAMA_BENCH_PATHS.push(path.join(p, 'llama-bench.exe'));
+});
+
 interface RunOptions {
   model?: string;
   quant?: string;
   output?: string;
+  path?: string;  // Custom llama-bench path
 }
 
 export async function runBenchmarks(options: RunOptions) {
@@ -27,20 +47,29 @@ export async function runBenchmarks(options: RunOptions) {
     console.log(chalk.white('Quantization: ') + chalk.yellow(quant));
     console.log(chalk.white('Backend: ') + chalk.green('llama.cpp (required)'));
 
-    // Check if llama.cpp is installed
-    spinner.start('Checking for llama.cpp');
-    try {
-      const { stdout } = await execAsync('llama-bench --version');
-      const version = stdout.trim() || 'unknown';
-      spinner.succeed(`llama.cpp found (${version})`);
-    } catch {
-      spinner.fail('llama.cpp not found');
-      console.log(chalk.yellow('\nInstall llama.cpp first:'));
+    // Find llama-bench binary
+    spinner.start('Finding llama-bench');
+    const llamaBenchPath = await findLlamaBench(options.path);
+    
+    if (!llamaBenchPath) {
+      spinner.fail('llama-bench not found');
+      console.log(chalk.yellow('\nInstall llama.cpp:'));
       console.log(chalk.white('  git clone https://github.com/ggerganov/llama.cpp'));
       console.log(chalk.white('  cd llama.cpp && make\n'));
-      console.log(chalk.yellow('Or use pre-built binaries:'));
-      console.log(chalk.blue('  https://github.com/ggerganov/llama.cpp/releases\n'));
+      console.log(chalk.yellow('Or specify custom path:'));
+      console.log(chalk.green('  llm-bench run --path=/path/to/llama-bench\n'));
       process.exit(1);
+    }
+
+    spinner.succeed(`Found: ${llamaBenchPath}`);
+
+    // Get version
+    try {
+      const { stdout } = await execAsync(`"${llamaBenchPath}" --version 2>&1 || echo "unknown"`);
+      const version = stdout.trim() || 'unknown';
+      console.log(chalk.white('Version: ') + chalk.gray(version));
+    } catch {
+      console.log(chalk.white('Version: ') + chalk.gray('unknown'));
     }
 
     // Run benchmark
@@ -89,6 +118,28 @@ export async function runBenchmarks(options: RunOptions) {
     console.error(chalk.red('Error:'), error);
     process.exit(1);
   }
+}
+
+async function findLlamaBench(customPath?: string): Promise<string | null> {
+  // If custom path provided, check it first
+  if (customPath) {
+    const customPaths = [customPath, path.join(customPath, 'llama-bench')];
+    for (const p of customPaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return null;
+  }
+
+  // Search common locations
+  for (const p of LLAMA_BENCH_PATHS) {
+    if (fs.existsSync(p)) {
+      return p;
+    }
+  }
+
+  return null;
 }
 
 async function detectGPU() {

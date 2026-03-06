@@ -27,6 +27,7 @@ program
   .option('-m, --model <model>', 'Model to benchmark (e.g., llama-3-70b)')
   .option('-q, --quant <quantization>', 'Quantization (INT4, INT8, FP16)')
   .option('-o, --output <file>', 'Output file path')
+  .option('-p, --path <path>', 'Custom llama-bench binary path')
   .action(async (options) => {
     await runBenchmarks(options);
   });

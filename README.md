@@ -37,7 +37,15 @@ llm-bench run --model=llama-3-70b --quant=INT4
 
 # Save results to specific file
 llm-bench run --output=my-benchmark.json
+
+# Custom llama-bench path (if not in PATH)
+llm-bench run --path=/home/user/llama.cpp/llama-bench
 ```
+
+**Auto-detection:**
+- Searches common locations (`~/llama.cpp`, `/usr/local/bin`, etc.)
+- Checks your PATH
+- Use `--path` if llama-bench is in custom location
 
 ### 4. Submit Results
 

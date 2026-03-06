@@ -1,6 +1,6 @@
 {
   "name": "@llmbench/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI tool for submitting GPU benchmarks to LLM Bench",
   "main": "dist/index.js",
   "bin": {
