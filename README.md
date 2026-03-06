@@ -10,7 +10,15 @@ npm install -g @llmbench/cli
 
 ## Quick Start
 
-### 1. Initialize with API Key
+### 1. Install llama.cpp (Required)
+
+```bash
+git clone https://github.com/ggerganov/llama.cpp
+cd llama.cpp && make
+sudo make install  # Or add to PATH manually
+```
+
+### 2. Initialize with API Key
 
 Get your free API key at [llmbench.net/api/keys](https://llmbench.net/api/keys), then:
 
@@ -18,10 +26,10 @@ Get your free API key at [llmbench.net/api/keys](https://llmbench.net/api/keys),
 llm-bench init --api-key=your_api_key
 ```
 
-### 2. Run Benchmarks
+### 3. Run Benchmarks
 
 ```bash
-# Auto-detect GPU, run default benchmark
+# Auto-detect GPU, run default benchmark (llama-3-70b INT4)
 llm-bench run
 
 # Specify model and quantization
@@ -31,7 +39,7 @@ llm-bench run --model=llama-3-70b --quant=INT4
 llm-bench run --output=my-benchmark.json
 ```
 
-### 3. Submit Results
+### 4. Submit Results
 
 ```bash
 llm-bench submit --file=benchmark.json
@@ -49,7 +57,7 @@ llm-bench init --api-key=llmbench_xxx
 
 ### `llm-bench run`
 
-Run benchmarks on your GPU using llama.cpp.
+Run benchmarks on your GPU using llama.cpp (required backend).
 
 **Options:**
 - `-m, --model <model>` - Model to benchmark (default: llama-3-70b)
@@ -57,8 +65,9 @@ Run benchmarks on your GPU using llama.cpp.
 - `-o, --output <file>` - Output file path (default: benchmark-[timestamp].json)
 
 **Requirements:**
-- llama.cpp installed and in PATH
+- llama.cpp installed and in PATH (`llama-bench` command must work)
 - NVIDIA GPU with CUDA support (AMD ROCm support coming soon)
+- Sufficient VRAM for selected model (e.g., 70B INT4 needs ~40GB)
 
 ### `llm-bench submit`
 

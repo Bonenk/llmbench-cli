@@ -20,19 +20,26 @@ export async function runBenchmarks(options: RunOptions) {
     const gpuInfo = await detectGPU();
     spinner.succeed(`GPU detected: ${chalk.cyan(gpuInfo.name)}`);
 
-    console.log(chalk.white('\nModel: ') + chalk.yellow(options.model || 'llama-3-70b'));
-    console.log(chalk.white('Quantization: ') + chalk.yellow(options.quant || 'INT4'));
+    const model = options.model || 'llama-3-70b';
+    const quant = options.quant || 'INT4';
+    
+    console.log(chalk.white('\nModel: ') + chalk.yellow(model));
+    console.log(chalk.white('Quantization: ') + chalk.yellow(quant));
+    console.log(chalk.white('Backend: ') + chalk.green('llama.cpp (required)'));
 
     // Check if llama.cpp is installed
     spinner.start('Checking for llama.cpp');
     try {
-      await execAsync('llama-bench --version');
-      spinner.succeed('llama.cpp found');
+      const { stdout } = await execAsync('llama-bench --version');
+      const version = stdout.trim() || 'unknown';
+      spinner.succeed(`llama.cpp found (${version})`);
     } catch {
       spinner.fail('llama.cpp not found');
       console.log(chalk.yellow('\nInstall llama.cpp first:'));
       console.log(chalk.white('  git clone https://github.com/ggerganov/llama.cpp'));
       console.log(chalk.white('  cd llama.cpp && make\n'));
+      console.log(chalk.yellow('Or use pre-built binaries:'));
+      console.log(chalk.blue('  https://github.com/ggerganov/llama.cpp/releases\n'));
       process.exit(1);
     }
 
